@@ -21,9 +21,13 @@
 #import "DisplayProfileEditor.h"
 #import "SavedDisplayProfilesView.h"
 #import "InputLease.h"
+#import "WorkspacePreview.h"
 
 static NSString *YMAppVersion(void) {
     return [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"—";
+}
+static BOOL YMLocalForkBuild(void) {
+    return [[NSBundle.mainBundle objectForInfoDictionaryKey:@"YMLocalForkBuild"] boolValue];
 }
 static NSImage *YMBrandIcon(void) {
     NSURL *url = [NSBundle.mainBundle URLForResource:@"Yomado" withExtension:@"icns"];
@@ -176,6 +180,7 @@ static NSString *JSONText(id object) { return JSONTextWithIdentifiers(object, NO
 @property NSButton *addDisplayButton;
 @property YMAppWorkspace *appWorkspace;
 @property YMInputLeaseCenter *inputLeases;
+@property YMWorkspacePreview *workspacePreview;
 @property NSStackView *applicationCards;
 @property NSView *permissionContainer;
 @property NSMutableDictionary<NSNumber *, YMAppWorkspaceView *> *workspaceViews;
@@ -481,6 +486,7 @@ static os_log_t YMQuitLog(void) {
     self.inputLeases = [[YMInputLeaseCenter alloc] init];
     [self.inputLeases start];
     [self startDisplayCommands];
+    self.workspacePreview = [[YMWorkspacePreview alloc] init];
     EventTypeSpec type = { kEventClassKeyboard, kEventHotKeyPressed };
     OSStatus handlerStatus = InstallEventHandler(GetApplicationEventTarget(), RecoveryHotkey, 1, &type,
                                                 (__bridge void *)self, &_keyHandler);
@@ -610,6 +616,9 @@ static os_log_t YMQuitLog(void) {
     }
     if (!active.count) [menu addItem:[[NSMenuItem alloc] initWithTitle:@"尚无运行中的虚拟屏" action:nil keyEquivalent:@""]];
     [menu addItem:[self menuItem:@"添加或启动虚拟屏…" action:@selector(showWindow:) profile:nil]];
+    NSMenuItem *preview = [self menuItem:@"在屏幕边缘预览虚拟屏" action:@selector(toggleWorkspacePreview:) profile:nil];
+    preview.state = self.workspacePreview.enabled ? NSControlStateValueOn : NSControlStateValueOff;
+    [menu addItem:preview];
     if (self.windowRecovery.needsRestoreBeforeRemovingVirtualDisplay)
         [menu addItem:[self menuItem:@"微信返回原显示器" action:@selector(wechatRestore:) profile:nil]];
     if (self.topologyRecoverySnapshot)
@@ -629,6 +638,11 @@ static os_log_t YMQuitLog(void) {
     }
     [menu addItem:NSMenuItem.separatorItem];
     [menu addItem:[self menuItem:@"完全退出 yomado" action:@selector(quit:) profile:nil]];
+}
+- (void)toggleWorkspacePreview:(id)sender {
+    (void)sender;
+    [self.workspacePreview setEnabled:!self.workspacePreview.enabled];
+    [self updateInventory];
 }
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
     if (item.action == @selector(checkForUpdates:))
@@ -663,7 +677,7 @@ static os_log_t YMQuitLog(void) {
     }];
 }
 - (void)openWebsite:(id)sender { (void)sender; [self openProductURL:@"https://yomado.app/"]; }
-- (void)openSource:(id)sender { (void)sender; [self openProductURL:@"https://github.com/chekusu/yomado"]; }
+- (void)openSource:(id)sender { (void)sender; [self openProductURL:@"https://github.com/daymade/yomado"]; }
 - (void)openLicense:(id)sender { (void)sender; [self openProductURL:@"https://github.com/chekusu/yomado/blob/main/LICENSE"]; }
 - (NSButton *)footerLink:(NSString *)title action:(SEL)action tooltip:(NSString *)tooltip {
     NSButton *button = [NSButton buttonWithTitle:title target:self action:action];
@@ -677,6 +691,7 @@ static os_log_t YMQuitLog(void) {
 }
 - (NSString *)updateStatusText {
     if (self.updateRecoveryMessage.length) return self.updateRecoveryMessage;
+    if (YMLocalForkBuild()) return @"本地 Fork 构建";
     NSString *version = self.automaticUpdater.latestVersion ?: @"";
     switch (self.automaticUpdater.status) {
         case YMAutomaticUpdateChecking: return @"正在检查更新…";
@@ -696,13 +711,13 @@ static os_log_t YMQuitLog(void) {
     NSString *status = [self updateStatusText];
     self.updateStatusLabel.stringValue = status;
     self.updateStatusLabel.toolTip = status;
-    self.updateStatusRow.hidden = !self.updateRecoveryMessage.length && self.automaticUpdater.status == YMAutomaticUpdateIdle;
+    self.updateStatusRow.hidden = !YMLocalForkBuild() && !self.updateRecoveryMessage.length && self.automaticUpdater.status == YMAutomaticUpdateIdle;
     self.updateButton.action = self.updateRecoveryFailed ? @selector(retryUpdateRecovery:) : @selector(checkForUpdates:);
     self.updateButton.enabled = !self.previewMode && !self.updateWorkspaceBusy && (self.updateRecoveryFailed || self.automaticUpdater.canCheck);
     self.updateButton.toolTip = self.updateRecoveryFailed ? @"重试恢复更新前工作区" : self.automaticUpdater.canCheck ? @"检查、下载并安装更新" : status;
     [self.updateButton setAccessibilityLabel:self.updateButton.toolTip];
     self.automaticUpdatesButton.state = self.automaticUpdater.automaticUpdatesEnabled ? NSControlStateValueOn : NSControlStateValueOff;
-    self.automaticUpdatesButton.enabled = !self.previewMode && !self.updateWorkspaceBusy;
+    self.automaticUpdatesButton.enabled = !YMLocalForkBuild() && !self.previewMode && !self.updateWorkspaceBusy;
     self.cancelUpdateButton.hidden = !self.automaticUpdater.canCancel;
     self.updateProgress.hidden = !self.automaticUpdater.busy;
     self.updateProgress.indeterminate = self.automaticUpdater.progress < 0;
@@ -756,6 +771,7 @@ static os_log_t YMQuitLog(void) {
     [self updateInventory];
 }
 - (void)beginUpdater {
+    if (YMLocalForkBuild()) { [self refreshUpdateUI]; return; }
     if (self.automaticUpdater || self.previewMode) return;
     self.automaticUpdater = [[YMAutomaticUpdater alloc] initWithHostBundle:NSBundle.mainBundle];
     __weak ADController *weakSelf = self;
@@ -772,7 +788,7 @@ static os_log_t YMQuitLog(void) {
 }
 - (void)checkForUpdates:(id)sender {
     (void)sender;
-    if (self.previewMode || self.updateRecoveryFailed || self.updateWorkspaceBusy) return;
+    if (YMLocalForkBuild() || self.previewMode || self.updateRecoveryFailed || self.updateWorkspaceBusy) return;
     self.updateRecoveryMessage = nil;
     [self showWindow:nil];
     [self.automaticUpdater checkNow];
@@ -780,7 +796,7 @@ static os_log_t YMQuitLog(void) {
 }
 - (void)toggleAutomaticUpdates:(id)sender {
     (void)sender;
-    if (self.previewMode || self.updateWorkspaceBusy) return;
+    if (YMLocalForkBuild() || self.previewMode || self.updateWorkspaceBusy) return;
     self.automaticUpdater.automaticUpdatesEnabled = !self.automaticUpdater.automaticUpdatesEnabled;
     [self refreshUpdateUI];
 }
@@ -1323,7 +1339,7 @@ static os_log_t YMQuitLog(void) {
     self.automaticUpdatesButton.toolTip = @"定期检查正式版；下载和校验后，安全恢复工作区并重新打开应用";
     [footer addArrangedSubview:self.automaticUpdatesButton];
     [footer addArrangedSubview:YMSpacer()];
-    [footer addArrangedSubview:[self footerLink:@"GitHub" action:@selector(openSource:) tooltip:@"开源代码 · github.com/chekusu/yomado"]];
+    [footer addArrangedSubview:[self footerLink:@"GitHub" action:@selector(openSource:) tooltip:@"开源代码 · github.com/daymade/yomado"]];
     [footer addArrangedSubview:[self footerLink:@"MIT" action:@selector(openLicense:) tooltip:@"MIT 开源许可证"]];
     [stack addArrangedSubview:footer]; YMFillWidth(footer, stack);
     self.updateStatusRow = YMStack(NSUserInterfaceLayoutOrientationHorizontal, 8);
@@ -1617,6 +1633,11 @@ static os_log_t YMQuitLog(void) {
             NSMutableArray *ids = [NSMutableArray array];
             for (YMManagedDisplay *profile in [self activeProfiles]) [ids addObject:@(profile.display.displayID)];
             [self.appWorkspace refreshWithVirtualDisplayIDs:ids displaySnapshot:snapshot];
+            NSMutableArray *previewDisplays = [NSMutableArray array];
+            for (YMManagedDisplay *profile in [self activeProfiles])
+                if (profile.topologyVerified)
+                    [previewDisplays addObject:@{@"displayID":@(profile.display.displayID), @"name":[self titleForProfile:profile]}];
+            [self.workspacePreview updateDisplays:previewDisplays];
             [self updateWeChatControls];
         }
         [self updateApplicationCardsWithSnapshot:snapshot];
@@ -2352,6 +2373,7 @@ static os_log_t YMQuitLog(void) {
     (void)notification;
     [self.panelPresenter invalidate];
     [self.inputLeases stop];
+    [self.workspacePreview invalidate];
     [NSNotificationCenter.defaultCenter removeObserver:self];
     [self.heartbeatTimer invalidate];
     if (self.hotkey) UnregisterEventHotKey(self.hotkey);
@@ -2630,6 +2652,7 @@ static int PreviewUI(NSString *path, NSString *state, BOOL dark) {
 // window recovery on close. Moving windows stays with the agent's own tools.
 static NSString *const YMDisplayCommandRequestName = @"dev.chekusu.yomado.display.request";
 static NSString *const YMDisplayCommandResponseName = @"dev.chekusu.yomado.display.response";
+static NSString *const YMDisplayMarkName = @"dev.chekusu.yomado.display.mark";
 static NSString *const YMDisplayCommandObject = @"dev.chekusu.yomado";
 static NSString *const YMDisplayCommandsEnabledKey = @"YMDisplayCommandsEnabled";
 static const NSTimeInterval YMDisplayCommandSeconds = 45;
@@ -2639,6 +2662,18 @@ static const NSTimeInterval YMDisplayCommandSeconds = 45;
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(displayCommandReceived:)
         name:YMDisplayCommandRequestName object:YMDisplayCommandObject
         suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+    [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(displayMarkReceived:)
+        name:YMDisplayMarkName object:YMDisplayCommandObject
+        suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+}
+// An agent reports where it just acted so the person can follow along in the preview.
+- (void)displayMarkReceived:(NSNotification *)note {
+    if (![NSUserDefaults.standardUserDefaults boolForKey:YMDisplayCommandsEnabledKey]) return;
+    NSDictionary *info = [note.userInfo isKindOfClass:NSDictionary.class] ? note.userInfo : @{};
+    if (![info[@"x"] isKindOfClass:NSNumber.class] || ![info[@"y"] isKindOfClass:NSNumber.class]) return;
+    double x = [info[@"x"] doubleValue], y = [info[@"y"] doubleValue];
+    if (!isfinite(x) || !isfinite(y)) return;
+    [self.workspacePreview markPoint:CGPointMake(x, y)];
 }
 - (void)displayCommandRespond:(NSString *)requestID status:(NSString *)status extra:(NSDictionary *)extra {
     NSMutableDictionary *info = [extra ?: @{} mutableCopy];
@@ -2798,7 +2833,8 @@ static const NSTimeInterval YMDisplayCommandSeconds = 45;
 static int YMDisplayCommandUsage(void) {
     fprintf(stderr, "Usage: Yomado --display list\n"
                     "       Yomado --display start --name <name> [--width 1920|2560] [--hidpi 1|0]\n"
-                    "       Yomado --display close --name <name>\n");
+                    "       Yomado --display close --name <name>\n"
+                    "       Yomado --display mark --x <x> --y <y>\n");
     return 64;
 }
 
@@ -2806,6 +2842,13 @@ static int YMDisplayCommand(int argc, const char *argv[]) {
     @autoreleasepool {
         if (argc < 3) return YMDisplayCommandUsage();
         NSString *action = [NSString stringWithUTF8String:argv[2]];
+        if ([action isEqualToString:@"mark"]) {
+            // One-way: Yomado --display mark --x <x> --y <y>   (global desktop points, origin top-left)
+            if (argc != 7 || strcmp(argv[3], "--x") || strcmp(argv[5], "--y")) return YMDisplayCommandUsage();
+            [NSDistributedNotificationCenter.defaultCenter postNotificationName:YMDisplayMarkName object:YMDisplayCommandObject
+                userInfo:@{@"x":@(atof(argv[4])), @"y":@(atof(argv[6]))} options:NSDistributedNotificationDeliverImmediately];
+            return 0;
+        }
         if (![@[@"list", @"start", @"close"] containsObject:action]) return YMDisplayCommandUsage();
         NSMutableDictionary *message = [@{@"action":action} mutableCopy];
         for (int index = 3; index < argc; index += 2) {

@@ -56,6 +56,7 @@ bash "$ym_root/scripts/test-update-workspace-recovery.sh"
 # Pure injected backend/controller regressions; never touch live displays.
 bash "$ym_root/scripts/test-display-topology.sh"
 bash "$ym_root/scripts/test-controller-safety.sh"
+bash "$ym_root/scripts/test-workspace-preview.sh"
 
 bash "$ym_root/scripts/test-panel-presentation.sh"
 # Image-only app icon regressions; no application or displays are started.
