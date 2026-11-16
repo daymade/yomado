@@ -1251,12 +1251,24 @@ static const NSUInteger kYMInventoryMaxCGCandidates = 512;
 }
 - (BOOL)performRestoreBundle:(NSString *)bundle sourceID:(CGDirectDisplayID)sourceID physicalTarget:(NSDictionary *)physicalTarget error:(NSError **)error {
     if (!YMWorkspaceGenericRestoreAllowed(bundle)) return [self fail:error code:4 text:@"请先把 yomado 控制面板移回实体屏，再关闭此虚拟屏。"];
+    NSArray *visible = [self.windowAccess visibleWindows];
+    if (!visible) return [self fail:error code:3 text:@"无法读取窗口清单，尚未恢复任何窗口。"];
+    NSMutableSet *participatingPIDs = [NSMutableSet set];
+    for (NSDictionary *cg in visible)
+        if ([cg[@"pid"] isKindOfClass:NSNumber.class] && !YMWorkspaceCGCandidateClearlyInvisible(cg))
+            [participatingPIDs addObject:cg[@"pid"]];
+    for (YMWPlacement *placement in self.placements)
+        if ([placement.bundleID isEqual:bundle] && placement.identity[@"pid"])
+            [participatingPIDs addObject:placement.identity[@"pid"]];
     // Collect every same-bundle process candidate before the first restore write —
     // a sibling timeout/blocker must not leave earlier processes already moved.
+    // Windowless tray helpers can share the editor's bundle ID while denying AX.
+    // Keep uncertain CG rows and remembered placements in the checked set.
     NSMutableArray *operations = [NSMutableArray array];
     NSNumber *sourceFilter = sourceID ? @(sourceID) : nil;
     for (NSRunningApplication *app in [self.windowAccess applicationsForBundleIdentifier:bundle]) {
         if (app.terminated) continue;
+        if (![participatingPIDs containsObject:@(app.processIdentifier)]) continue;
         NSArray *candidates = [self candidatesForApplication:app sourceFilter:sourceFilter error:error];
         if (!candidates) return NO;
         for (NSDictionary *candidate in candidates) {
@@ -1265,6 +1277,18 @@ static const NSUInteger kYMInventoryMaxCGCandidates = 512;
             [operations addObject:@{@"application": app, @"candidate": candidate}];
         }
     }
+    // AX collection can yield while a previously windowless helper opens a
+    // window, or another same-bundle process starts. Recheck before any write.
+    NSArray *latestVisible = [self.windowAccess visibleWindows];
+    if (!latestVisible) return [self fail:error code:3 text:@"无法读取窗口清单，尚未恢复任何窗口。"];
+    NSMutableSet *latestPIDs = [NSMutableSet set];
+    for (NSDictionary *cg in latestVisible)
+        if ([cg[@"pid"] isKindOfClass:NSNumber.class] && !YMWorkspaceCGCandidateClearlyInvisible(cg))
+            [latestPIDs addObject:cg[@"pid"]];
+    for (NSRunningApplication *app in [self.windowAccess applicationsForBundleIdentifier:bundle])
+        if (!app.terminated && [latestPIDs containsObject:@(app.processIdentifier)] &&
+            ![participatingPIDs containsObject:@(app.processIdentifier)])
+            return [self fail:error code:13 text:@"应用出现了新窗口；已停止恢复，请刷新后再试。"];
     NSUInteger restored = 0, fallback = 0;
     for (NSDictionary *operation in operations) {
         NSRunningApplication *app = operation[@"application"];

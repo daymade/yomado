@@ -2492,6 +2492,55 @@ int main(void) {
                   @"process B restores its remembered physical origin");
         }
 
+        // Same-bundle tray helpers have no visible windows and may deny AX.
+        for (NSString *helperEvidence in @[@"none", @"unknownCG", @"checkpoint", @"appearing", @"newProcess", @"lateCGFailure"]) {
+            YMFakeWindowAccess *access = [YMFakeWindowAccess new];
+            [access installApp:42 name:@"Editor" bundle:@"test.calculator"];
+            YMFakeRunningApp *helper = [access installApp:41 name:@"Tray helper" bundle:@"test.calculator"];
+            NSDictionary *frame = Frame(2700, 100, 230, 408);
+            [access installWindowPID:42 windowID:1500 cgFrame:frame axFrame:frame];
+            [access.forceIncompletePIDs addObject:@41];
+            access.incompleteReason = @"enumerationFailed";
+            if ([helperEvidence isEqual:@"unknownCG"])
+                [access.cgWindows addObject:@{@"pid":@41, @"windowID":@1501, @"frame":frame}];
+            YMWorkspaceFixture *workspace = [[YMWorkspaceFixture alloc] initWithWindowAccess:access];
+            [workspace refreshWithVirtualDisplayIDs:@[@8] displaySnapshot:displays];
+            if ([helperEvidence isEqual:@"checkpoint"])
+                [workspace installPlacementElement:@"helper-window" application:helper windowID:1501
+                    origin:@{@"displayUUID":@"physical", @"relative":Frame(100,100,230,408)}
+                    lastDisplayID:8 identity:Identity(41,1501)];
+            BOOL appearing = [helperEvidence isEqual:@"appearing"] || [helperEvidence isEqual:@"newProcess"];
+            BOOL lateCGFailure = [helperEvidence isEqual:@"lateCGFailure"];
+            if (appearing || lateCGFailure) {
+                __block BOOL added = NO;
+                __weak YMFakeWindowAccess *weakAccess = access;
+                access.observeApplicationSideEffect = ^(pid_t pid, NSTimeInterval deadline) {
+                    (void)deadline;
+                    if (pid != 42 || added) return;
+                    added = YES;
+                    if (lateCGFailure) { weakAccess.failVisibleWindows = YES; return; }
+                    pid_t latePID = [helperEvidence isEqual:@"newProcess"] ? 44 : 41;
+                    if (latePID == 44) [weakAccess installApp:44 name:@"New helper" bundle:@"test.calculator"];
+                    [weakAccess.forceIncompletePIDs addObject:@(latePID)];
+                    [weakAccess.cgWindows addObject:@{@"pid":@(latePID), @"windowID":@1502,
+                        @"frame":frame, @"layer":@0, @"onScreen":@YES, @"alpha":@1}];
+                };
+            }
+            [access.observedPIDs removeAllObjects];
+            NSError *error = nil;
+            BOOL restored = [workspace restoreApplicationWithBundleIdentifier:@"test.calculator"
+                fromDisplayID:8 toPhysicalDisplayID:5 error:&error];
+            BOOL windowless = [helperEvidence isEqual:@"none"];
+            Check(restored == windowless, @"only a proven windowless helper is omitted from restore");
+            Check(access.positionWrites.count == (windowless ? 1u : 0u),
+                  @"uncertain sibling evidence still blocks every restore write");
+            if (windowless) {
+                Check(![access.observedPIDs containsObject:@41], @"windowless helper is not queried through AX");
+                Check([access.positionWrites.firstObject[@"identity"] isEqual:Identity(42,1500)],
+                      @"restore addresses the real editor identity");
+            } else Check(error.code == (lateCGFailure ? 3 : appearing ? 13 : 6), @"uncertain or newly appearing helper blocks restore");
+        }
+
         // --- Global fix: MUST_FIX #1 missing layer after ready must not TTL-reuse ---
         {
             YMFakeWindowAccess *access = nil;
