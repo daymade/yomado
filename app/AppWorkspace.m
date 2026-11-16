@@ -6,6 +6,22 @@
 
 NSString * const YMAppWorkspaceErrorDomain = @"dev.chekusu.yomado.app-workspace";
 
+// Keep an app-enforced size inside the actual display. A Dock may reserve more
+// width than the app can relinquish, but the title bar must remain accessible.
+static NSDictionary *YMWFrameKeepingSizeOnDisplay(NSDictionary *frame, NSDictionary *display) {
+    NSDictionary *actual = YMWorkspaceGeometry(frame), *bounds = YMWorkspaceGeometry(display[@"bounds"]);
+    NSDictionary *available = YMWorkspaceUsablePlacementBounds(display);
+    if (!actual || !bounds || !available) return nil;
+    double width = [actual[@"width"] doubleValue], height = [actual[@"height"] doubleValue];
+    double left = [bounds[@"x"] doubleValue], top = [available[@"y"] doubleValue];
+    double right = left + [bounds[@"width"] doubleValue];
+    double bottom = [bounds[@"y"] doubleValue] + [bounds[@"height"] doubleValue];
+    if (width > right - left || height > bottom - top) return nil;
+    return @{@"x": @(fmin(fmax([actual[@"x"] doubleValue], left), right - width)),
+             @"y": @(fmin(fmax([actual[@"y"] doubleValue], top), bottom - height)),
+             @"width": actual[@"width"], @"height": actual[@"height"]};
+}
+
 static const NSTimeInterval kYMInventoryBudget = 1.0;
 static const NSTimeInterval kYMInventoryPIDBudget = 0.2;
 static const NSTimeInterval kYMInventoryCacheTTL = 1.0;
@@ -1094,6 +1110,7 @@ static const NSUInteger kYMInventoryMaxCGCandidates = 512;
     if (![self displayStillCurrent:display]) return NO;
     CGPoint point = CGPointMake([frame[@"x"] doubleValue], [frame[@"y"] doubleValue]);
     if (![self.windowAccess setPosition:point element:element expectedIdentity:identity]) return NO;
+    BOOL resizedAfterMove = NO, adjustedPosition = NO;
     for (NSUInteger observation = 0; observation < 4; observation++) {
         // The run loop permits external screen changes while settling. Never
         // accept a frame against stale bounds after a display moves/disappears.
@@ -1103,7 +1120,27 @@ static const NSUInteger kYMInventoryMaxCGCandidates = 512;
             ![live[@"ordinary"] boolValue] || [live[@"minimized"] boolValue] ||
             ![live[@"positionSettable"] boolValue] || !YMWorkspaceGeometry(live[@"frame"]))
             return NO;
+        if (![self displayStillCurrent:display]) return NO;
         if (YMWorkspaceFrameFits(live[@"frame"], display)) return YES;
+        NSDictionary *actual = live[@"frame"];
+        if (!resizedAfterMove &&
+            (fabs([actual[@"width"] doubleValue] - size.width) > 1 ||
+             fabs([actual[@"height"] doubleValue] - size.height) > 1)) {
+            // Some editors acknowledge AXSize on the old screen without applying
+            // it. Retry once on the destination, then trust only fresh geometry.
+            resizedAfterMove = YES;
+            (void)[self.windowAccess setSize:size element:element expectedIdentity:identity];
+        } else if (resizedAfterMove && [self.ownedIDs containsObject:display[@"displayID"]]) {
+            NSDictionary *fitted = YMWFrameKeepingSizeOnDisplay(actual, display);
+            if (fitted && fabs([actual[@"x"] doubleValue] - [fitted[@"x"] doubleValue]) <= 2 &&
+                fabs([actual[@"y"] doubleValue] - [fitted[@"y"] doubleValue]) <= 2)
+                return YES;
+            if (fitted && !adjustedPosition) {
+                adjustedPosition = YES;
+                CGPoint correction = CGPointMake([fitted[@"x"] doubleValue], [fitted[@"y"] doubleValue]);
+                if (![self.windowAccess setPosition:correction element:element expectedIdentity:identity]) return NO;
+            }
+        }
         if (observation < 3)
             [NSRunLoop.currentRunLoop runMode:NSDefaultRunLoopMode
                                    beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.15]];

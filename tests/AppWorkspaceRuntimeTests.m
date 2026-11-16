@@ -64,6 +64,10 @@ static NSDictionary *Identity(pid_t pid, CGWindowID windowID) {
 @property(nonatomic) NSTimeInterval observeDelay;
 @property(nonatomic) NSUInteger failNextPositionWrites;
 @property(nonatomic) BOOL syncCGOnWrite;
+@property(nonatomic) BOOL ignoreSizeBeforeFirstPosition;
+@property(nonatomic) BOOL ignoreSizeWrites;
+@property(nonatomic) double minimumWidth;
+@property(nonatomic, copy) void (^sizeWriteSideEffect)(void);
 @property(nonatomic) BOOL flipIdentityOnNextObserveElement;
 /// 1-based: when observeElementCount reaches this value, apply observeElementMutation once.
 @property(nonatomic) NSUInteger mutateOnObserveElementCount;
@@ -366,8 +370,14 @@ static NSDictionary *Identity(pid_t pid, CGWindowID windowID) {
         @"element": element ?: [NSNull null]}];
     self.writeCount++;
     NSDictionary *prior = self.elementFrames[key] ?: Frame(0, 0, size.width, size.height);
+    if (self.ignoreSizeWrites || (self.ignoreSizeBeforeFirstPosition && !self.positionWrites.count))
+        return YES;
     [self updateAXFrame:Frame([prior[@"x"] doubleValue], [prior[@"y"] doubleValue], size.width, size.height)
              forElement:element];
+    if (size.width < self.minimumWidth)
+        [self updateAXFrame:Frame([prior[@"x"] doubleValue], [prior[@"y"] doubleValue],
+                                  self.minimumWidth, size.height) forElement:element];
+    if (self.sizeWriteSideEffect) self.sizeWriteSideEffect();
     return YES;
 }
 @end
@@ -748,8 +758,81 @@ static void UnmovableCloseChecks(void) {
     }
 }
 
+static void PostMoveResizeChecks(void) {
+    // A real editor acknowledged a resize on the source screen without applying
+    // it, then accepted the same resize after being moved to the target screen.
+    NSArray *cases = @[
+        @{@"name": @"resize only after move", @"visible": Frame(2560, 30, 1920, 1050), @"minimum": @0},
+        @{@"name": @"minimum width overlaps right Dock", @"visible": Frame(2560, 30, 1875, 1050), @"minimum": @1900},
+        @{@"name": @"minimum width overlaps left Dock", @"visible": Frame(2605, 30, 1875, 1050), @"minimum": @1900}
+    ];
+    for (NSDictionary *caseInfo in cases) {
+        YMFakeWindowAccess *access = nil; NSURL *URL = nil;
+        NSDictionary *origin = Frame(0, 30, 2486, 1050);
+        YMWorkspaceFixture *workspace = ManagerFixture(&access, &URL, origin, origin);
+        NSMutableDictionary *target = [RuntimeDisplay(8, 2560, YES, @"agent-a") mutableCopy];
+        target[@"bounds"] = Frame(2560, 0, 1920, 1080);
+        target[@"visibleBounds"] = caseInfo[@"visible"];
+        [workspace refreshWithVirtualDisplayIDs:@[@8]
+                              displaySnapshot:@[RuntimeDisplay(5, 0, NO, @"physical"), target]];
+        access.ignoreSizeBeforeFirstPosition = YES;
+        access.minimumWidth = [caseInfo[@"minimum"] doubleValue];
+        NSError *error = nil;
+        Check([workspace moveApplicationAtURL:URL fromDisplayID:5 toDisplayID:8 error:&error],
+              caseInfo[@"name"]);
+        Check(access.sizeWrites.count == 2, @"ignored source resize is retried once after movement");
+        NSDictionary *actual = access.currentFrame;
+        Check([actual[@"x"] doubleValue] >= 2560 &&
+              [actual[@"x"] doubleValue] + [actual[@"width"] doubleValue] <= 4480 &&
+              [actual[@"y"] doubleValue] >= 30 &&
+              [actual[@"y"] doubleValue] + [actual[@"height"] doubleValue] <= 1080,
+              @"the entire editor remains on the virtual display with its title bar below the menu bar");
+        Check(access.activationRequests == 0, @"post-move resize never activates the application");
+    }
+    for (NSNumber *ignoreAll in @[@YES, @NO]) {
+        YMFakeWindowAccess *access = nil; NSURL *URL = nil;
+        NSDictionary *origin = Frame(0, 30, 2486, 1050);
+        YMWorkspaceFixture *workspace = ManagerFixture(&access, &URL, origin, origin);
+        NSMutableDictionary *target = [RuntimeDisplay(8, 2560, YES, @"agent-a") mutableCopy];
+        target[@"bounds"] = Frame(2560, 0, 1920, 1080);
+        [workspace refreshWithVirtualDisplayIDs:@[@8]
+                              displaySnapshot:@[RuntimeDisplay(5, 0, NO, @"physical"), target]];
+        access.ignoreSizeBeforeFirstPosition = YES;
+        access.ignoreSizeWrites = ignoreAll.boolValue;
+        access.minimumWidth = ignoreAll.boolValue ? 0 : 2000;
+        NSError *error = nil;
+        Check(![workspace moveApplicationAtURL:URL fromDisplayID:5 toDisplayID:8 error:&error],
+              @"an editor still wider than the display fails even after retry");
+        Check(error.code == 12 && YMWorkspaceSameFrame(access.currentFrame, origin),
+              @"uncontained editors return to their original frame instead of being reported as moved");
+    }
+    {
+        YMFakeWindowAccess *access = nil; NSURL *URL = nil;
+        NSDictionary *origin = Frame(0, 30, 2486, 1050);
+        YMWorkspaceFixture *workspace = ManagerFixture(&access, &URL, origin, origin);
+        NSMutableDictionary *target = [RuntimeDisplay(8, 2560, YES, @"agent-a") mutableCopy];
+        target[@"bounds"] = Frame(2560, 0, 1920, 1080);
+        [workspace refreshWithVirtualDisplayIDs:@[@8]
+                              displaySnapshot:@[RuntimeDisplay(5, 0, NO, @"physical"), target]];
+        access.ignoreSizeBeforeFirstPosition = YES;
+        __weak YMFakeWindowAccess *weakAccess = access;
+        access.sizeWriteSideEffect = ^{
+            for (NSString *key in weakAccess.elementIdentities.allKeys) {
+                NSMutableDictionary *replacement = [weakAccess.elementIdentities[key] mutableCopy];
+                replacement[@"windowID"] = @9999;
+                weakAccess.elementIdentities[key] = replacement;
+            }
+        };
+        NSError *error = nil;
+        Check(![workspace moveApplicationAtURL:URL fromDisplayID:5 toDisplayID:8 error:&error],
+              @"a replaced window after the resize retry is never accepted");
+        Check(access.positionWrites.count == 1, @"a replacement receives neither correction nor rollback writes");
+    }
+}
+
 int main(void) {
     @autoreleasepool {
+        PostMoveResizeChecks();
         UnmovableCloseChecks();
         NSArray *displays = RuntimeDisplays();
 
