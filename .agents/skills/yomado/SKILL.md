@@ -9,7 +9,7 @@ Let the agent prepare its own work screen; the user does not need to create it m
 
 ## Before changing anything
 
-- Confirm yomado is installed and the agent has tools for reading the actual native UI, screenshots and input. Use the available tool's documentation for its calls; do not invent an API. If the app is missing, use the official [download](https://yomado.app/) within the user's installation authority.
+- Confirm yomado is installed and the agent has tools for reading the actual native UI, screenshots and input. Use the available tool's documentation for its calls; do not invent an API. For this fork, use [build and installation](https://github.com/daymade/yomado/blob/main/docs/LOCAL-FORK.md#build-and-install) within the user's installation authority. An upstream download does not install this fork's changes.
 - Check that the capture tool supports selecting a non-primary display or its target window before creating a screen or moving apps. If it is known to capture only the primary display, stop before moving windows; a new screen will not fix that limitation.
 - The macOS desktop must be logged in and unlocked. The user handles first-time macOS permission grants and any authentication. yomado needs window-control permission; the agent's tools need their own capture/input permissions.
 - Identify the task's apps and windows from the user's request. Inspect the current screen layout, physical main display, virtual display names/IDs, bounds and scale, plus the original bounds of the windows that may move. Keep this recovery record local; do not publish window titles, screenshots or machine identifiers.
@@ -19,7 +19,7 @@ Let the agent prepare its own work screen; the user does not need to create it m
 ## Prepare the screen
 
 1. Open yomado's control panel from its menu-bar item or by opening the installed app. Opening an existing instance brings back its panel; do not quit or restart it to find the panel.
-2. Inspect the live UI. In v0.3.3, the menu-bar accessibility label is `yomado · 夜窗` and its panel item is `打开控制面板`. Labels may change in later versions; use current observations, not fixed coordinates.
+2. Inspect the live UI. The menu-bar accessibility label may be `yomado · 夜窗` and its panel item may be `打开控制面板`. Labels may change; use current observations, not fixed coordinates.
 3. If the live panel has `＋ 新建屏幕`, open it, enter a task-owned name such as `Codex · Blender`, choose resolution and HiDPI, then select `创建并启动`. For a saved task-owned screen, use `启动` in the `未启动的虚拟屏` section; use `编辑` to change its stopped configuration without starting it. Running screens can be renamed from `…` → `重命名…`. Older releases may still use the header `+` menu and saved-screen submenus: follow the controls actually observed, never fixed coordinates or assumed labels.
 4. Record the new screen's actual ID/bounds/scale. A renamed running screen can retain its old name in macOS until restarted; do not restart merely to synchronize the name.
 5. Compare the display arrangement and main display with the checkpoint before moving apps. Adding or removing displays can rearrange the desktop in released versions. If an existing screen moved, stop and report the discrepancy; do not continue moving user windows or silently change the main display. Resolve layout only within the user's authority.
@@ -81,7 +81,7 @@ The user may be working on the physical screens while the agent works on the vir
 
    Get every other approval the step needs first (for example the agent tool's own full-control or app-access prompts), then request the lease, so the lease time is not spent waiting on them. If the agent's tool hides other apps while it has full control, include yomado in its allowed apps so the prompt and notice stay visible. Run each `status` check on its own and wait for it before the next input batch.
 
-   Request only the time the step needs (10–600 seconds), with room for capture and verification. A lease is permission to post input, not a guarantee the user is away; keep batches short and re-capture before each one. Never borrow real input without a granted lease, and never ask repeatedly after a denial.
+   Request only the time the step needs, with room for capture and verification; use the limits in [InputLeasePolicy.h](https://github.com/daymade/yomado/blob/main/app/InputLeasePolicy.h). A lease is permission to post input, not a guarantee the user is away; keep batches short and re-capture before each one. Never borrow real input without a granted lease, and never ask repeatedly after a denial.
 
 ## Return windows and finish
 
@@ -94,4 +94,22 @@ The user may be working on the physical screens while the agent works on the vir
 
 ## Current command-line boundary
 
-The public v0.3.3 app has `--diagnose` for local capability/display diagnostics. Versions that include the input lease also accept `--input request|status|release` as described above. There is no public create/move/restore CLI or management RPC; do not invent or probe such commands, including `--help` (unknown arguments open the normal app UI). Do not add `--include-device-identifiers` to shared diagnostics. `--preview-ui` renders sample data, while `--self-test` and `--watchdog-test` are developer tests that can change displays; none is a normal work-screen setup command.
+Use the binary from the installed app being operated, not another build with the same name. The parser and replies in [app/Yomado.m](https://github.com/daymade/yomado/blob/main/app/Yomado.m) are authoritative.
+
+`--diagnose` provides local capability/display diagnostics; omit `--include-device-identifiers` from shared diagnostics. The input-lease commands are described above.
+
+For display management, first read `YMDisplayCommandsEnabled` for the installed bundle's preferences. It is an explicit opt-in: enable it only within the user's authority with `defaults write dev.chekusu.yomado YMDisplayCommandsEnabled -bool true`. The commands use the same-user local notification bus, not an authenticated network service.
+
+```sh
+/path/to/Yomado.app/Contents/MacOS/Yomado --display list
+/path/to/Yomado.app/Contents/MacOS/Yomado --display start --name "Codex · Blender"
+/path/to/Yomado.app/Contents/MacOS/Yomado --display close --name "Codex · Blender"
+```
+
+`list`, `start` and `close` return one JSON line. Exit 0 means `ok`, `running` or `closed`; exit 2 means refusal/failure, and exit 3 means yomado is not running. These requests return `disabled` when the opt-in is off. `start` creates or reuses the named screen and waits for verified topology; use the returned current display ID and desktop bounds. A name alone does not authorize reuse.
+
+Moving windows still uses the scoped UI/tool workflow above: there is no window-move or window-restore CLI. Before closing, wait for `list`'s `inventory.ready`, account for every window and retain the existing ownership/recovery checks. `close` does not show a consent dialog; when recovery cannot be verified, it keeps the screen and returns `failed`. Stop and resolve the reported cause rather than retrying or forcing a close.
+
+The fork also accepts `--display mark --x <x> --y <y>` to annotate its view-only preview at a global desktop point (top-left origin). It sends a one-way notification: exit 0 is not a JSON reply, delivery acknowledgement or proof that a marker appeared. Verify the actual preview. It does not move the pointer or inject input; preview controls and capture permission are covered in [preview operation](https://github.com/daymade/yomado/blob/main/docs/LOCAL-FORK.md#preview-and-window-acceptance).
+
+Unknown arguments, including `--help`, open the normal app UI. Do not probe invented commands. `--preview-ui` renders sample data, while `--self-test` and `--watchdog-test` are developer tests that can change displays; none is a normal work-screen setup command.

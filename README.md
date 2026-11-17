@@ -4,7 +4,7 @@
 
 A work screen for visual agents, designed to let physical screens rest. yomado adds named virtual displays to your Mac, so Codex and other computer-use AI agents can work in desktop apps through screenshots, mouse and keyboard on a screen of their own while your windows stay where they are.
 
-[Website](https://yomado.app/) · [Download for Apple Silicon](https://github.com/chekusu/yomado/releases/download/v0.3.7/Yomado.zip) · [Release notes](https://github.com/chekusu/yomado/releases/tag/v0.3.7) · [简体中文](README.zh-CN.md) · [MIT license](LICENSE)
+[Build and install this fork](docs/LOCAL-FORK.md) · [Upstream project](https://github.com/chekusu/yomado) · [简体中文](README.zh-CN.md) · [MIT license](LICENSE)
 
 ## See yomado in 60 seconds
 
@@ -24,11 +24,11 @@ These workflows still need a graphical desktop and a display surface for applica
 
 ## Let your agent set it up
 
-You do not have to create a virtual screen or arrange its apps yourself. The included [yomado skill](skills/yomado/SKILL.md) guides a computer-use-capable agent through creating and naming a work screen, moving the task's windows into it, checking visual access, and returning them when finished.
+You do not have to create a virtual screen or arrange its apps yourself. The included [yomado skill](.agents/skills/yomado/SKILL.md) guides a computer-use-capable agent through creating and naming a work screen, moving the task's windows into it, checking visual access, and returning them when finished.
 
 > Use $yomado to prepare a virtual screen named “Codex · Blender” for this task. Move only this task's windows, verify that you can see and operate them, and restore them when finished.
 
-For Codex, install the repository's `skills/yomado` folder in `$CODEX_HOME/skills` (default: `~/.codex/skills`); it is available from the next turn. Other agents can read the same `SKILL.md` using their skill mechanism. yomado and the agent's computer-use tools must be installed; you handle initial macOS permission grants. The skill uses the app's existing UI and shares the desktop's focus and input.
+For Codex, install the repository's `.agents/skills/yomado` folder using the current [Codex Skill installation guide](https://learn.chatgpt.com/docs/build-skills). Other agents can read the same `SKILL.md` using their skill mechanism. yomado and the agent's computer-use tools must be installed; you handle initial macOS permission grants. The skill uses the app's existing UI and shares the desktop's focus and input.
 
 ![yomado usage concept: two dark physical monitors, an awake Mac, and a virtual desktop on the right with 3D and garment-design windows.](docs/images/yomado-usage-night-window.png)
 
@@ -60,7 +60,7 @@ A local live test used the application chooser to move Calculator from a physica
 ## FAQ
 
 **How do I give Codex or another computer-use agent its own screen on a Mac?**
-Install yomado, add a virtual display named after the agent, and drag the task's apps onto it. The agent's own computer-use tools capture and operate that screen. With the [yomado skill](skills/yomado/SKILL.md) installed, the agent can set up the screen itself and move the windows back when it is done.
+Install yomado, add a virtual display named after the agent, and drag the task's apps onto it. The agent's own computer-use tools capture and operate that screen. With the [yomado skill](.agents/skills/yomado/SKILL.md) installed, the agent can set up the screen itself and move the windows back when it is done.
 
 **Why not let the agent use my main screen?**
 An agent that works through screenshots and clicks needs its apps visible somewhere. On your main screen they sit on top of your work; on a virtual display they render out of your way, and you can still look at the agent's screen in yomado's panel or any screen viewer.
@@ -78,28 +78,11 @@ None of these; it only supplies the display. Unlike a macOS virtual machine, the
 That is the goal, but it has not been validated yet. See [Physical monitors](#physical-monitors).
 
 **Which Macs does it run on, and what does it cost?**
-Apple silicon Macs, built for macOS 14 and later. Free and open source under the MIT license; official releases are signed with Developer ID and notarized by Apple. It is experimental and uses private macOS APIs.
+Apple silicon Macs, built for macOS 14 and later. Free and open source under the MIT license. For this fork's build and signing procedure, see [local fork operation](docs/LOCAL-FORK.md). It is experimental and uses private macOS APIs.
 
 ## Build
 
-Requires macOS and Xcode or the Command Line Tools. The app uses system frameworks only; there are no third-party runtime dependencies.
-
-```sh
-bash ./build.sh
-```
-
-Outputs:
-
-```text
-dist/Yomado.app
-dist/Yomado.zip
-```
-
-The build script selects the active Xcode or Command Line Tools installation through `xcrun`. Set `YOMADO_DEVELOPER_DIR` to select another developer directory.
-
-The native Apple Silicon build has been verified. The macOS 14 deployment target is a build setting, not a claim that every macOS 14+ system or Intel Mac is supported. An experimental Apple Silicon build is available in [GitHub Releases](https://github.com/chekusu/yomado/releases/tag/v0.3.7), with a SHA-256 checksum. Intel binaries are not supplied. The official v0.3.7 archive is signed by CHEKUSU INC. with Developer ID, notarized by Apple, and includes a stapled notarization ticket. Notarization is separate from Mac App Store review.
-
-Local builds receive an **ad hoc signature** by default. Setting `YOMADO_SIGNING_IDENTITY` explicitly enables Developer ID Application signing with the hardened runtime and secure timestamps for both the app and its recovery helper. This signing step does not submit the app for notarization. See the [website distribution process](docs/distribution.md) for signing, Apple notarization, stapling and release checks. A release is described as notarized only after Apple accepts that exact build and its final download passes verification. Follow your Mac's normal security policies when choosing whether to run a local build.
+Follow [Build, install and upgrade this fork](docs/LOCAL-FORK.md#build-and-install). Build inputs and dependency pins belong to [build.sh](build.sh) and [fetch-sparkle.sh](scripts/fetch-sparkle.sh).
 
 ## Use the virtual display
 
@@ -109,7 +92,7 @@ Local builds receive an **ad hoc signature** by default. Setting `YOMADO_SIGNING
 4. Drag an app’s icon back into a physical screen to return its windows there, or use the icon’s return action. Dragging between physical screens is not provided; move the actual window for that operation. App counts reflect detected visible windows, not measured GPU activity or agent progress. Some apps reject Accessibility window positioning; yomado reports the failure.
 5. Select the virtual screen in your viewing or agent tools, if supported. Verify a fresh target-app screenshot and an actual reversible input action before starting work.
 
-Keep a physical display as the main display. Adjust the actual display arrangement in macOS Displays settings when needed. Resolution and HiDPI settings apply when starting a closed screen: HiDPI doubles each pixel dimension, so a 1920 × 1080 logical desktop becomes 3840 × 2160 pixels.
+Keep a physical display as the main display. Adjust the actual display arrangement in macOS Displays settings when needed. Resolution and HiDPI settings apply when starting a closed screen; read the current logical and pixel dimensions from the running display.
 
 Changing displays, window positions, or scaling can invalidate an agent's saved coordinates. Refresh its screenshot and window state after each change. A successful screenshot does not by itself prove that keyboard or mouse input works.
 
@@ -129,33 +112,19 @@ Agents should prefer background input that leaves your pointer, focus and front 
 ./dist/Yomado.app/Contents/MacOS/Yomado --input release --lease <leaseID>
 ```
 
-yomado shows the request on the main screen with **允许** and **拒绝**; an unanswered request is refused after 60 seconds. While a lease is active, a notice stays at the top-right of the main screen, "Agent 正在使用你的鼠标键盘", with the agent's name, the time left and a **停止** button. A lease lasts 10 to 600 seconds and ends on release, expiry or Stop. After a release or expiry, yomado puts the pointer and front app back where they were; after Stop it leaves them with you. Each command prints one JSON line; exit status 0 means granted, released, active or idle.
+yomado shows the request on the main screen with **允许** and **拒绝**; an unanswered request is refused when its decision deadline passes. While a lease is active, a notice stays at the top-right of the main screen, "Agent 正在使用你的鼠标键盘", with the agent's name, the time left and a **停止** button. A lease ends on release, expiry or Stop; duration limits are defined in [InputLeasePolicy.h](app/InputLeasePolicy.h). After a release or expiry, yomado puts the pointer and front app back where they were; after Stop it leaves them with you. Each command prints one JSON line; exit status 0 means granted, released, active or idle.
 
-yomado does not post input itself and cannot block an agent's tool. The lease is a permission and a visible notice: the [yomado skill](skills/yomado/SKILL.md) tells agents to check it before each batch of real input and to stop when it ends.
+yomado does not post input itself and cannot block an agent's tool. The lease is a permission and a visible notice: the [yomado skill](.agents/skills/yomado/SKILL.md) tells agents to check it before each batch of real input and to stop when it ends.
 
 ## Let an agent manage its own screen
 
-Off by default. Enable it once with `defaults write dev.chekusu.yomado YMDisplayCommandsEnabled -bool true`; while it is off, every request answers `disabled`. Like `--input`, the commands travel on a local notification bus, so once enabled any process running as you can list, start or close yomado's screens.
-
-```sh
-./dist/Yomado.app/Contents/MacOS/Yomado --display list
-./dist/Yomado.app/Contents/MacOS/Yomado --display start --name "Claude" [--width 1920|2560] [--hidpi 1|0]
-./dist/Yomado.app/Contents/MacOS/Yomado --display close --name "Claude"
-```
-
-`start` creates the named screen if it doesn't exist and waits until topology is verified; the reply includes its display ID and desktop bounds. `close` uses the same window recovery as the panel but never shows a dialog: if windows can't be returned, it keeps the screen and replies `failed` with the reason. `list` includes `inventory.ready`; the window list settles a moment after windows move, so poll `list` until `ready` is true before closing. Moving windows onto the screen stays with the agent's own tools. Each command prints one JSON line; exit status 0 means `ok`, `running` or `closed`, 2 a refusal or failure, 3 yomado not running.
+Use the yomado Skill's [command-line workflow](.agents/skills/yomado/SKILL.md#current-command-line-boundary), including its enable switch, response checks and close/recovery boundary.
 
 ## Version and updates
 
-The panel footer links to [yomado.app](https://yomado.app/), this GitHub repository and the MIT license, alongside the installed version. Click the refresh icon next to the version, or **Check and Install Updates…** (`检查并安装更新…`) in the menu-bar menu. The menu bar uses a transparent, monochrome silhouette of the night-window logo that follows the system appearance; the full app icon keeps its dark background.
+For this fork, follow [upgrade and recovery](docs/LOCAL-FORK.md#upgrade-and-recover). The [upstream updater release guide](docs/AUTOMATIC-UPDATES.md) is for release engineering.
 
 Opening yomado again brings back its control panel, including after closing or minimizing it. Explicitly opening the panel recovers it onto a visible physical screen when one is available, without moving other apps or changing the display layout.
-
-Automatic updates are enabled by default and can be switched off in the panel or menu bar. The refresh icon and **Check and Install Updates…** use the same in-app flow: download a compatible stable release, verify the signed feed and archive, install it, and reopen yomado. Experimental releases are not installed automatically. No GitHub account or browser download is required. Errors and progress appear in the panel; an update can be cancelled before installation starts.
-
-Before restarting, yomado checkpoints active virtual screens and the exact existing windows inside them, then recreates those screens and restores those windows. It does not save documents or reconnect remote sessions. Dialogs, full-screen/minimized or unidentifiable windows, a pending dedicated WeChat recovery checkpoint, a virtual main display, missing window-control permission, or a changing layout postpone installation while the current app keeps running. After resolving the cause, check again to retry. Physical-display settings and unrelated application windows are not intentionally changed. Recovery refuses replacement windows or a different process, and stops if the display configuration changes. The private, short-lived checkpoint contains only window/process identities and geometry. See [update distribution and verification](docs/AUTOMATIC-UPDATES.md).
-
-Older versions without the in-app updater need one ordinary upgrade to an updater-capable version. Subsequent stable releases can install through yomado.
 
 ## WeChat window recovery (experimental)
 
@@ -163,7 +132,7 @@ WeChat appears as an app icon inside its screen, alongside other applications. M
 
 If Accessibility permission is missing, a **lock icon** appears in the header and window movement is disabled. Click that icon to open the relevant page under **Privacy & Security**, then enable yomado yourself. This page is called **Accessibility** on earlier macOS versions, and **Device Control & Data Access** on macOS 27. If yomado is absent from the list, use **+** to select the app. The panel detects the updated permission automatically and hides the lock icon when access is granted. Permission is requested only when you click the icon; opening the settings page does not grant it.
 
-Local builds are ad hoc signed by default. After rebuilding, macOS may retain a permission record tied to an older signature even though its switch appears enabled. If the lock icon remains after reopening the app, remove the old yomado entry in System Settings, add the current app with **+**, and enable it again. yomado does not reset or edit system permission records itself.
+If a replacement build still lacks access while its permission switch is enabled, follow the [signed-app replacement diagnosis](https://github.com/daymade/claude-code-skills/blob/main/daymade-macos/macos-permissions/references/tcc-mechanics.md#signed-app-replacement-with-an-enabled-but-ineffective-grant).
 
 While that move is pending, a limited check can recognize supported security/login dialogs and return WeChat to its physical screen without clicking the prompt. Ordinary chat-window contents are never scanned. Some WeChat versions do not expose those dialogs in a recognizable form; automatic return is not guaranteed, so keep the manual return action available. An automatic failure pauses further attempts. Stopping or quitting yomado is held if a pending WeChat return fails.
 
@@ -189,7 +158,7 @@ A read-only interface and display inventory check:
 
 Physical display serial numbers are redacted by default. The optional `--include-device-identifiers` flag includes them for local diagnosis. Inventory output still describes your display setup; inspect and sanitize it before sharing.
 
-The build script compiles, signs, and strictly verifies the staged bundle. The default signature is ad hoc; Developer ID signing requires an explicit `YOMADO_SIGNING_IDENTITY`. It does **not** launch the app or run display tests.
+For build and signing behavior, follow [local build operation](docs/LOCAL-FORK.md#build-and-install).
 
 Pure policy tests can run without creating a display or opening an application:
 

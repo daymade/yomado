@@ -1,6 +1,6 @@
 # Website distribution
 
-yomado's full-featured build is distributed through its website and GitHub Releases. This document describes the Developer ID signing and Apple notarization process; it is not evidence that a particular release has completed it. Check that release's notes and downloadable artifact. Apple notarization is separate from Mac App Store review and does not establish private-API compatibility or validate the app's functionality.
+For local fork installation, use [local fork operation](LOCAL-FORK.md). This document describes the upstream website-release procedure, including Developer ID signing and Apple notarization; it is not evidence that a particular release has completed it. Check that release's notes and downloadable artifact. Apple notarization is separate from Mac App Store review and does not establish private-API compatibility or validate the app's functionality.
 
 ## Prepare a separate build
 
