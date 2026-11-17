@@ -4,7 +4,7 @@
 
 为视觉 Agent 留一块工作屏，让实体屏可以休息。yomado 在 Mac 上添加命名的虚拟显示器，让 Codex 等 computer use AI Agent 在自己的屏幕上通过截图、鼠标和键盘操作桌面应用，你的窗口留在原处。
 
-[官方网站](https://yomado.app/) · [English](README.md) · [MIT 许可证](LICENSE)
+[本 Fork 安装与升级](docs/LOCAL-FORK.md) · [上游项目](https://github.com/chekusu/yomado) · [English](README.md) · [MIT 许可证](LICENSE)
 
 ## 60 秒看懂 yomado
 
@@ -24,11 +24,11 @@ yomado 主要是为了支持 **Codex 或其他 Agent 通过视觉操作电脑**�
 
 ## 把准备工作也交给 Agent
 
-你不需要专门替 Agent 手动创建虚拟屏、安排应用。仓库附带的 [yomado skill](skills/yomado/SKILL.md)，指导具备电脑操作能力的 Agent 自行建屏、命名、移入本次任务的窗口、验证截图与操作，并在完成后把窗口恢复。
+你不需要专门替 Agent 手动创建虚拟屏、安排应用。仓库附带的 [yomado skill](.agents/skills/yomado/SKILL.md)，指导具备电脑操作能力的 Agent 自行建屏、命名、移入本次任务的窗口、验证截图与操作，并在完成后把窗口恢复。
 
 > 用 $yomado 为这次 Blender 任务准备一块叫「Codex · Blender」的虚拟屏。只移入本任务的窗口，确认你能看到并操作它们，完成后恢复原位置。
 
-在 Codex 中，将仓库的 `skills/yomado` 文件夹安装到 `$CODEX_HOME/skills`（默认为 `~/.codex/skills`），下一轮对话即可使用；其他 Agent 可以通过自己的 skill 机制读取同一份 `SKILL.md`。需要先安装 yomado，并为 Agent 配备电脑操作工具；首次 macOS 系统授权由你完成。skill 使用现有应用界面，仍与当前桌面共用焦点和输入。
+在 Codex 中，按当前 [Codex Skill 安装指南](https://learn.chatgpt.com/docs/build-skills)安装仓库的 `.agents/skills/yomado` 文件夹；其他 Agent 可以通过自己的 skill 机制读取同一份 `SKILL.md`。需要先安装 yomado，并为 Agent 配备电脑操作工具；首次 macOS 系统授权由你完成。skill 使用现有应用界面，仍与当前桌面共用焦点和输入。
 
 ![yomado 使用示意：两台熄屏的实体显示器、保持运行的 Mac，以及右侧显示三维和服装设计窗口的虚拟桌面。](docs/images/yomado-usage-night-window.png)
 
@@ -60,7 +60,7 @@ yomado 主要是为了支持 **Codex 或其他 Agent 通过视觉操作电脑**�
 ## 常见问题
 
 **怎样在 Mac 上给 Codex 或其他 computer use Agent 一块单独的屏幕？**
-安装 yomado，新建一块以 Agent 命名的虚拟屏，把任务需要的应用拖进去。Agent 用它自己的 computer use 工具截取和操作这块屏。装上 [yomado skill](skills/yomado/SKILL.md) 后，Agent 可以自己准备屏幕，做完再把窗口放回原处。
+安装 yomado，新建一块以 Agent 命名的虚拟屏，把任务需要的应用拖进去。Agent 用它自己的 computer use 工具截取和操作这块屏。装上 [yomado skill](.agents/skills/yomado/SKILL.md) 后，Agent 可以自己准备屏幕，做完再把窗口放回原处。
 
 **为什么不直接让 Agent 用我的主屏？**
 靠截图和点击工作的 Agent，需要它的应用显示在某块屏幕上。放在主屏会盖住你正在做的事；放在虚拟屏，它们在一旁渲染，你也随时能在 yomado 面板或任何看屏工具里查看 Agent 的屏幕。
@@ -78,34 +78,11 @@ yomado 主要是为了支持 **Codex 或其他 Agent 通过视觉操作电脑**�
 这是目标，但尚未验证。见[实体显示器](#实体显示器)。
 
 **支持哪些 Mac？收费吗？**
-支持 Apple 芯片的 Mac，面向 macOS 14 及以上构建。免费开源（MIT 许可证），正式版本使用 Developer ID 签名并经 Apple 公证。这是实验版本，使用了 macOS 私有 API。
+支持 Apple 芯片的 Mac，面向 macOS 14 及以上构建。免费开源（MIT 许可证）。本 Fork 的构建与签名方式见[本地 Fork 操作手册](docs/LOCAL-FORK.md)。这是实验版本，使用了 macOS 私有 API。
 
-## 下载
+## 下载与编译
 
-[下载 Apple Silicon 应用](https://github.com/chekusu/yomado/releases/download/v0.3.7/Yomado.zip) · [版本说明](https://github.com/chekusu/yomado/releases/tag/v0.3.7)
-
-官方 v0.3.7 下载包已由 CHEKUSU INC. 使用 Developer ID 签名，并通过 Apple 公证、附带公证票据。它仍是使用私有 API 的实验版本；Apple 公证不等同于 Mac App Store 上架。
-
-## 编译
-
-需要 macOS，以及 Xcode 或 Command Line Tools。只依赖系统框架，没有第三方运行依赖。
-
-```sh
-bash ./build.sh
-```
-
-生成：
-
-```text
-dist/Yomado.app
-dist/Yomado.zip
-```
-
-构建脚本通过 `xcrun` 使用当前 Xcode 或 Command Line Tools，也可以设置 `YOMADO_DEVELOPER_DIR` 选择其他开发工具目录。
-
-目前验证过 Apple Silicon 原生构建。macOS 14 部署目标只是编译设置，不代表所有 macOS 14 及以上系统、或 Intel Mac 均已兼容。[GitHub Releases](https://github.com/chekusu/yomado/releases/tag/v0.3.7) 提供实验性的 Apple Silicon 应用和 SHA-256 校验值，暂不提供 Intel 版本。
-
-本地构建默认使用 **ad hoc 签名**。显式设置 `YOMADO_SIGNING_IDENTITY` 后，脚本会为应用和恢复进程使用 Developer ID Application 签名、强化运行时及安全时间戳；此步骤不会自动提交 Apple 公证。[官网分发流程](docs/distribution.md) 说明签名、公证、附加公证票据及发布验证。只有 Apple 接受该构建、最终下载包也通过验证后，才会将该版本标记为已公证。是否运行本地构建，请遵循自己 Mac 的正常安全策略。
+本仓使用源码构建；按[本地 Fork 操作手册](docs/LOCAL-FORK.md#build-and-install)编译、安装或升级。[上游发布页](https://github.com/chekusu/yomado/releases)提供的是上游程序，不能用于安装本 Fork 的改动。构建参数和依赖固定值分别以 [build.sh](build.sh) 与 [fetch-sparkle.sh](scripts/fetch-sparkle.sh) 为准。
 
 ## 使用虚拟屏
 
@@ -135,33 +112,19 @@ Agent 应优先使用后台输入：辅助功能动作，以及只发给目标 A
 ./dist/Yomado.app/Contents/MacOS/Yomado --input release --lease <leaseID>
 ```
 
-yomado 会在主屏弹出申请，提供「允许」和「拒绝」；60 秒内没有回应即自动拒绝。获准期间，主屏右上角会一直显示「Agent 正在使用你的鼠标键盘」，附 Agent 名称、剩余时间和「停止」按钮。每次借用 10 到 600 秒，Agent 归还、到期或你按下「停止」时结束。归还或到期后，yomado 会把光标和前台 App 放回原处；按「停止」时则保持现状，交还给你。每条命令输出一行 JSON；退出码 0 表示已获准、已归还、仍有效或空闲。
+yomado 会在主屏弹出申请，提供「允许」和「拒绝」；回应期限到达后仍未回应即自动拒绝。获准期间，主屏右上角会一直显示「Agent 正在使用你的鼠标键盘」，附 Agent 名称、剩余时间和「停止」按钮。Agent 归还、到期或你按下「停止」时结束；时限以 [InputLeasePolicy.h](app/InputLeasePolicy.h) 为准。归还或到期后，yomado 会把光标和前台 App 放回原处；按「停止」时则保持现状，交还给你。每条命令输出一行 JSON；退出码 0 表示已获准、已归还、仍有效或空闲。
 
-yomado 自己不发送输入，也无法拦住 Agent 的工具。借用只是一种许可加可见提示：[yomado skill](skills/yomado/SKILL.md) 要求 Agent 每批真实输入前都检查一次，借用结束就立即停下。
+yomado 自己不发送输入，也无法拦住 Agent 的工具。借用只是一种许可加可见提示：[yomado skill](.agents/skills/yomado/SKILL.md) 要求 Agent 每批真实输入前都检查一次，借用结束就立即停下。
 
 ## 让 Agent 自己管理虚拟屏
 
-默认关闭。执行一次 `defaults write dev.chekusu.yomado YMDisplayCommandsEnabled -bool true` 开启；关闭时所有请求都回复 `disabled`。和 `--input` 一样，命令走本机通知总线，开启后以你身份运行的任何进程都能列出、启动或关闭 yomado 的虚拟屏。
+按 yomado Skill 的[命令行流程](.agents/skills/yomado/SKILL.md#current-command-line-boundary)执行，包括启用开关、回复判定和关闭／恢复边界。
 
-```sh
-./dist/Yomado.app/Contents/MacOS/Yomado --display list
-./dist/Yomado.app/Contents/MacOS/Yomado --display start --name "Claude" [--width 1920|2560] [--hidpi 1|0]
-./dist/Yomado.app/Contents/MacOS/Yomado --display close --name "Claude"
-```
+## 版本与更新
 
-`start` 在虚拟屏不存在时新建，等拓扑核对完成后返回，回复里带显示器 ID 和桌面坐标。`close` 走和控制面板相同的窗口恢复流程，但不弹对话框：窗口回不去时保留虚拟屏，直接回复 `failed` 和原因。`list` 带 `inventory.ready`；窗口挪动后清单要过一会儿才稳定，关屏前请反复 `list` 直到 `ready` 为 true。把窗口挪进虚拟屏仍由 Agent 自己的工具完成。每条命令输出一行 JSON；退出码 0 表示 `ok`、`running` 或 `closed`，2 表示拒绝或失败，3 表示 yomado 没在运行。
+本 Fork 按[升级与恢复](docs/LOCAL-FORK.md#upgrade-and-recover)操作；[上游更新发布说明](docs/AUTOMATIC-UPDATES.md)仅用于发布工程。
 
-## 版本与检查更新
-
-面板底部显示当前版本，并提供 [yomado.app](https://yomado.app/)、GitHub 源码和 MIT 协议入口。点击版本旁的刷新图标，或菜单栏菜单中的「检查并安装更新…」。菜单栏只保留夜窗 logo 的窗子轮廓，背景透明、颜色跟随系统外观；应用图标仍保留完整深色底图。
-
-关闭或最小化控制面板后，重新打开 yomado 会唤回面板。明确打开面板时，如果有可用实体屏，会把落在虚拟屏或屏幕范围外的面板恢复到实体屏，只调整控制面板本身，不移动其他应用或修改屏幕排列。
-
-自动更新默认开启，可在面板或菜单栏关闭。版本旁的刷新图标和「检查并安装更新…」使用同一流程：下载兼容的正式版、验证更新源与压缩包签名、安装并重新打开 yomado。不自动安装实验预发布版，也不需要 GitHub 账号或跳转浏览器下载。面板显示进度和失败原因；安装开始前可以取消。
-
-重启前会记录运行中的虚拟屏和其中现有窗口的身份、位置，重启后重建工作屏并恢复这些窗口。这不是文档自动保存，也不会重连远程会话。存在弹窗、全屏或最小化窗口、无法可靠识别的窗口、待恢复的微信专用检查点、虚拟屏作为主屏、缺少窗口控制权限或布局仍在变化时，会暂缓安装并保持当前应用运行；处理后再次检查即可重试。不主动修改实体屏设置或其他应用窗口。窗口被替换、应用进程变化或显示配置变化时，恢复会停止，不会寻找同名窗口代替。短期恢复记录只在本机保存窗口/进程标识与几何信息。详见[更新发布与验证](docs/AUTOMATIC-UPDATES.md)。
-
-没有内置安装功能的旧版，需要先正常升级一次；之后的正式版本即可通过 yomado 完成更新。
+关闭或最小化控制面板后，重新打开 yomado 会唤回面板。如果有可用实体屏，会把面板恢复到实体屏，只调整控制面板本身，不移动其他应用或修改屏幕排列。
 
 ## 微信窗口恢复（实验功能）
 
@@ -169,7 +132,7 @@ yomado 自己不发送输入，也无法拦住 Agent 的工具。借用只是一
 
 未开启辅助功能权限时，标题区域会出现**锁形图标**，应用图标拖放暂不可用。点击锁形图标可直接进入「隐私与安全」下的对应页面，再由你开启 yomado 开关。旧系统称为「辅助功能」，macOS 27 称为「设备控制和数据访问」。列表中没有该应用时，点「＋」选择应用。授权后，面板会自动识别并收起锁形图标。只有点击该图标才会请求权限，打开设置页面本身不会完成授权。
 
-本地构建默认使用 ad hoc 签名。重新编译后，系统可能仍保留绑定旧签名的权限记录，开关显示开启也未必对新构建生效。重新打开应用后仍显示锁形图标时，请在系统设置中移除旧 yomado 记录，再用「＋」添加当前应用并开启。yomado 不会自行重置或修改系统权限记录。
+替换构建后，权限开关已开启但程序仍无权限时，进入[签名变更后的权限诊断](https://github.com/daymade/claude-code-skills/blob/main/daymade-macos/macos-permissions/references/tcc-mechanics.md#signed-app-replacement-with-an-enabled-but-ineffective-grant)。
 
 移屏后，软件会有限度检查受支持的登录或安全对话框，识别成功就把微信送回实体屏，不会点击提示。普通聊天窗口的内容不会被扫描。部分微信版本没有提供可识别的对话框标记，因此不能保证自动返回，仍需保留手动恢复入口。自动恢复失败后会暂停后续尝试；如果还有待恢复的微信窗口且恢复失败，停止或退出 yomado 会被阻止。
 
@@ -195,7 +158,7 @@ yomado 自己不发送输入，也无法拦住 Agent 的工具。借用只是一
 
 默认隐藏实体显示器序列号。需要本地诊断时，可加 `--include-device-identifiers` 参数将其包含在输出中。清单仍会描述你的显示配置，分享前应检查并清理。
 
-构建脚本编译、签名并严格验证临时构建中的应用包，**不会**启动应用或运行显示器测试。默认使用 ad hoc 签名；Developer ID 签名需要显式设置 `YOMADO_SIGNING_IDENTITY`。
+构建与签名方式见[本地构建流程](docs/LOCAL-FORK.md#build-and-install)。
 
 以下纯策略测试不会创建显示器或打开应用：
 
