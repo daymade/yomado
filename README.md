@@ -92,7 +92,7 @@ Follow [Build, install and upgrade this fork](docs/LOCAL-FORK.md#build-and-insta
 4. Drag an app’s icon back into a physical screen to return its windows there, or use the icon’s return action. Dragging between physical screens is not provided; move the actual window for that operation. App counts reflect detected visible windows, not measured GPU activity or agent progress. Some apps reject Accessibility window positioning; yomado reports the failure.
 5. Select the virtual screen in your viewing or agent tools, if supported. Verify a fresh target-app screenshot and an actual reversible input action before starting work.
 
-Keep a physical display as the main display. Adjust the actual display arrangement in macOS Displays settings when needed. Resolution and HiDPI settings apply when starting a closed screen: HiDPI doubles each pixel dimension, so a 1920 × 1080 logical desktop becomes 3840 × 2160 pixels.
+Keep a physical display as the main display. Adjust the actual display arrangement in macOS Displays settings when needed. Resolution and HiDPI settings apply when starting a closed screen; read the current logical and pixel dimensions from the running display.
 
 Changing displays, window positions, or scaling can invalidate an agent's saved coordinates. Refresh its screenshot and window state after each change. A successful screenshot does not by itself prove that keyboard or mouse input works.
 
